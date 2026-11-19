@@ -67,9 +67,9 @@ function money(value) {
    return utils.valueFormat(value ?? 0) ?? "0.00";
 }
 
+// Same rule as the web page: 0 when either side is 0.
 function percent(part, whole) {
-   if (!whole) return "";
-   return `${money((part / whole) * 100)} %`;
+   return `${money(part && whole ? (part / whole) * 100 : 0)} %`;
 }
 
 function header(title, subtitle, tlName) {
