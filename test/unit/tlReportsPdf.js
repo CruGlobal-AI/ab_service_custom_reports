@@ -5,7 +5,6 @@
 import { expect } from "chai";
 import fs from "fs";
 import path from "path";
-import os from "os";
 import {
    buildRcBalancePdf,
    buildBudgetVsExpensePdf,
@@ -21,7 +20,7 @@ function isPdf(buffer) {
 function keep(name, buffer) {
    const dir = process.env.TL_PDF_OUT;
    if (!dir) return;
-   fs.writeFileSync(path.join(dir || os.tmpdir(), name), buffer);
+   fs.writeFileSync(path.join(dir, name), buffer);
 }
 
 describe("custom_reports: tlReportsPdf", function () {
