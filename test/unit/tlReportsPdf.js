@@ -12,7 +12,9 @@ import {
 } from "../../reports/pdf/tlReportsPdf.js";
 
 function isPdf(buffer) {
-   return Buffer.isBuffer(buffer) && buffer.subarray(0, 5).toString() == "%PDF-";
+   return (
+      Buffer.isBuffer(buffer) && buffer.subarray(0, 5).toString() == "%PDF-"
+   );
 }
 
 // Set TL_PDF_OUT=<folder> to keep the files and look at them.

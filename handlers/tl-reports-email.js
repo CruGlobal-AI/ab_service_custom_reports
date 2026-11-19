@@ -47,13 +47,12 @@ function roleLabel(role) {
    if (typeof translations == "string") {
       try {
          translations = JSON.parse(translations);
-      } catch (e) {
+      } catch {
          translations = [];
       }
    }
    return (translations ?? []).map((t) => t.Label).find((l) => l);
 }
-
 
 /**
  * @function loadTeamLeaders
@@ -129,7 +128,9 @@ function mergeRcBalanceItems(results) {
       });
    });
    return Object.values(byTitle).sort((a, b) =>
-      (a.title ?? "").toLowerCase().localeCompare((b.title ?? "").toLowerCase()),
+      (a.title ?? "")
+         .toLowerCase()
+         .localeCompare((b.title ?? "").toLowerCase()),
    );
 }
 
@@ -186,9 +187,7 @@ export async function sendTlReports(AB, req, opts) {
 
    try {
       const users = await req.retry(() =>
-         AB.objectUser()
-            .model()
-            .find({ where: { username }, populate: false }),
+         AB.objectUser().model().find({ where: { username }, populate: false }),
       );
       const user = users?.[0];
       if (!user) return skip("user not found");
