@@ -1,15 +1,19 @@
 /**
  * tl-reports-email-all
  * Email every Team Leader the "RC Balances" and "Budget vs. Actual" reports
- * of a closed fiscal month (see tl-reports-email.js for one TL).
+ * of a closed fiscal month (the work is in reports/tlReportsEmail.js).
  *
- * Called by the "TL Finance Reports Email" process (an API task) when a
- * Fiscal Month is set to Closing. It replies right away with the number of
- * Team Leaders, then sends the emails one after another in the background,
- * so the process does not wait for every PDF. A TL that fails is skipped.
+ * Called by the TLReportsEmail process task (process_manager) when a Fiscal
+ * Month is set to Closing. It replies right away with the number of Team
+ * Leaders, then sends the emails one after another in the background. A
+ * reply that waited for every PDF could time out and be sent again, which
+ * would email everyone twice. A TL that fails is skipped.
  */
 import ABBootstrap from "../AppBuilder/ABBootstrap.js";
-import { loadTeamLeaders, sendTlReports } from "./tl-reports-email.js";
+import {
+   loadTeamLeaders,
+   sendAllTlReports,
+} from "../reports/tlReportsEmail.js";
 
 export default {
    /**
@@ -29,14 +33,12 @@ export default {
     * fn
     * our Request handler.
     * @param {obj} req
-    *        the request object sent by api_sails
+    *        the request object sent by process_manager
     * @param {fn} cb
     *        a node style callback(err, results) to send data when job is finished
     */
    fn: async function handler(req, cb) {
       const fyPeriod = req.param("fyPeriod");
-      const sendTo = req.param("sendTo");
-      const from = req.param("from");
       req.log(`custom_reports.tl-reports-email-all: ${fyPeriod}`);
 
       let AB;
@@ -51,19 +53,11 @@ export default {
 
       cb(null, { status: "started", fyPeriod, teamLeaders: leaders.size });
 
-      let sent = 0;
-      let skipped = 0;
-      for (const [username, teams] of leaders) {
-         const result = await sendTlReports(AB, req, {
-            username,
-            fyPeriod,
-            teams,
-            sendTo,
-            from,
-         });
-         if (result.status == "sent") sent++;
-         else skipped++;
-      }
+      const { sent, skipped } = await sendAllTlReports(AB, req, leaders, {
+         fyPeriod,
+         sendTo: req.param("sendTo"),
+         from: req.param("from"),
+      });
       req.log(
          `tl-reports-email-all: ${fyPeriod} done, ${sent} sent, ${skipped} skipped`,
       );

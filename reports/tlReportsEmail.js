@@ -1,23 +1,19 @@
 /**
- * tl-reports-email
- * Email one Team Leader (TL) the "RC Balances" and "Budget vs. Actual"
- * reports of a closed fiscal month, as two PDF attachments.
+ * tlReportsEmail
+ * Email Team Leaders (TL) the "RC Balances" and "Budget vs. Actual" reports
+ * of a closed fiscal month, as two PDF attachments. Used by
+ * handlers/tl-reports-email-all.js. This is a helper, not a web report.
  *
- * Called once per TL by the month-close process (through an API task and
- * api_sails). The data comes from the same prepareData() the web reports
- * use, run as the TL, for each team the TL leads, so the numbers match what
- * the TL sees on screen for those teams.
- *
- * Nothing here fails the caller: a TL with no email, no team or no data is
- * skipped, and the reply says why (status "skipped").
+ * The data comes from the same prepareData() the web reports use, run as the
+ * TL, for each team the TL leads, so the numbers match what the TL sees on
+ * screen for those teams.
  */
-import ABBootstrap from "../AppBuilder/ABBootstrap.js";
-import balanceReport from "../reports/balance-report.js";
-import budgetVsExpense from "../reports/budget-vs-expense.js";
+import balanceReport from "./balance-report.js";
+import budgetVsExpense from "./budget-vs-expense.js";
 import {
    buildRcBalancePdf,
    buildBudgetVsExpensePdf,
-} from "../reports/pdf/tlReportsPdf.js";
+} from "./pdf/tlReportsPdf.js";
 
 const DEFAULT_FROM = "noreply@l2d.biz";
 const TEAM_LEADER_ROLE = "Team Leader";
@@ -109,17 +105,6 @@ export async function loadTeamLeaders(AB) {
    return leaders;
 }
 
-/**
- * @function findLedTeams
- * Names of the Ministry Teams where this user is a current Team Leader.
- * @param {ABFactory} AB
- * @param {string} username
- * @return {Promise<string[]>}
- */
-export async function findLedTeams(AB, username) {
-   return (await loadTeamLeaders(AB)).get(username) ?? [];
-}
-
 function mergeRcBalanceItems(results) {
    const byTitle = {};
    results.forEach((viewData) => {
@@ -172,14 +157,14 @@ function sendEmail(req, email) {
  * @param {ABUtils.reqService} req
  * @param {object} opts
  * @param {string} opts.username  the TL's username
+ * @param {string[]} opts.teams   the teams the TL leads
  * @param {string} opts.fyPeriod  the closed fiscal month, ex "FY25 M06"
- * @param {string[]} [opts.teams] the teams the TL leads (looked up if missing)
  * @param {string} [opts.sendTo]  send here instead of the TL (testing)
  * @param {string} [opts.from]
  * @return {Promise<object>}
  */
 export async function sendTlReports(AB, req, opts) {
-   const { username, fyPeriod } = opts;
+   const { username, teams, fyPeriod } = opts;
    const skip = (reason) => {
       req.log(`tl-reports-email: skipped ${username}: ${reason}`);
       return { status: "skipped", username, reason };
@@ -195,8 +180,7 @@ export async function sendTlReports(AB, req, opts) {
       const to = opts.sendTo || user.email;
       if (!to) return skip("no email");
 
-      const teams = opts.teams ?? (await findLedTeams(AB, username));
-      if (!teams.length) return skip("not a Team Leader of any team");
+      if (!teams?.length) return skip("not a Team Leader of any team");
 
       // Run the reports as the TL. SITE_ROLE is left empty on purpose: the
       // email holds only the teams the TL leads, even for a TL who is also
@@ -260,46 +244,22 @@ export async function sendTlReports(AB, req, opts) {
    }
 }
 
-export default {
-   /**
-    * Key: the cote message key we respond to.
-    */
-   key: "custom_reports.tl-reports-email",
-
-   inputValidation: {
-      // the TL's username (SITE_USER.username)
-      username: { string: true, required: true },
-      // the closed fiscal month, ex "FY25 M06"
-      fyPeriod: { string: true, required: true },
-      // send every email here instead of to the TL (testing)
-      sendTo: { string: true, optional: true },
-      from: { string: true, optional: true },
-   },
-
-   /**
-    * fn
-    * our Request handler.
-    * @param {obj} req
-    *        the request object sent by api_sails
-    * @param {fn} cb
-    *        a node style callback(err, results) to send data when job is finished
-    */
-   fn: async function handler(req, cb) {
-      const username = req.param("username");
-      const fyPeriod = req.param("fyPeriod");
-      req.log(`custom_reports.tl-reports-email: ${username} ${fyPeriod}`);
-
-      try {
-         const AB = await ABBootstrap.init(req);
-         const result = await sendTlReports(AB, req, {
-            username,
-            fyPeriod,
-            sendTo: req.param("sendTo"),
-            from: req.param("from"),
-         });
-         cb(null, result);
-      } catch (err) {
-         cb(null, { status: "skipped", username, reason: `${err}` });
-      }
-   },
-};
+/**
+ * @function sendAllTlReports
+ * Email every Team Leader in leaders, one after another.
+ * @param {ABFactory} AB
+ * @param {ABUtils.reqService} req
+ * @param {Map<string, string[]>} leaders  from loadTeamLeaders()
+ * @param {object} opts  { fyPeriod, sendTo?, from? } (see sendTlReports())
+ * @return {Promise<{sent: number, skipped: number}>}
+ */
+export async function sendAllTlReports(AB, req, leaders, opts) {
+   let sent = 0;
+   let skipped = 0;
+   for (const [username, teams] of leaders) {
+      const result = await sendTlReports(AB, req, { ...opts, username, teams });
+      if (result.status == "sent") sent++;
+      else skipped++;
+   }
+   return { sent, skipped };
+}
