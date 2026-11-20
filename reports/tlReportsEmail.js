@@ -26,6 +26,7 @@ const IDS = {
    // (staging fills "Ministry Team"; some tenants only have "Ministry Teams").
    AssignmentTeam: "59d32581-a30d-4904-abc8-2fbe246582ff", // Ministry Team
    AssignmentTeams: "396b8b01-8e11-49f8-b883-4052d9a96ae6", // Ministry Teams
+   AssignmentStart: "a4a3dc69-5afd-42eb-9758-bccee1d2a954",
    AssignmentEnd: "8e86d1dd-a67d-405a-806c-79879ca73513",
    PersonSystemAccess: "fbded672-b647-4d95-a7f6-92f38076c626",
 };
@@ -34,11 +35,12 @@ function one(value) {
    return Array.isArray(value) ? value[0] : value;
 }
 
-// Role "Label" is a multilingual field: read it from the row, or from its
-// translations when the model left it there.
-function roleLabel(role) {
-   if (!role || typeof role != "object") return role;
-   if (role.Label) return role.Label;
+// Role "Label" is a multilingual field. A role is a Team Leader when its
+// Label in any language is "Team Leader". Role rows are tenant data, so their
+// uuids differ between servers and can not be used here.
+function isTeamLeaderRole(role) {
+   if (!role) return false;
+   if (typeof role != "object") return role == TEAM_LEADER_ROLE;
    let translations = role.translations;
    if (typeof translations == "string") {
       try {
@@ -47,7 +49,9 @@ function roleLabel(role) {
          translations = [];
       }
    }
-   return (translations ?? []).map((t) => t.Label).find((l) => l);
+   return [role.Label, ...(translations ?? []).map((t) => t?.Label)].some(
+      (label) => label?.trim() == TEAM_LEADER_ROLE,
+   );
 }
 
 /**
@@ -65,6 +69,7 @@ export async function loadTeamLeaders(AB) {
       Assignments.fieldByID(IDS.AssignmentTeam),
       Assignments.fieldByID(IDS.AssignmentTeams),
    ].filter((f) => f);
+   const fStart = Assignments.fieldByID(IDS.AssignmentStart);
    const fEnd = Assignments.fieldByID(IDS.AssignmentEnd);
    const fAccess = AB.objectByID(fPerson.settings.linkObject)?.fieldByID(
       IDS.PersonSystemAccess,
@@ -76,8 +81,11 @@ export async function loadTeamLeaders(AB) {
 
    (rows ?? []).forEach((row) => {
       const role = one(row[fRole.relationName()]);
-      if (roleLabel(role) != TEAM_LEADER_ROLE) return;
+      if (!isTeamLeaderRole(role)) return;
 
+      // only current assignments: started, and not ended
+      const start = fStart ? row[fStart.columnName] : null;
+      if (start && new Date(start) > now) return;
       const end = row[fEnd.columnName];
       if (end && new Date(end) < now) return;
 
