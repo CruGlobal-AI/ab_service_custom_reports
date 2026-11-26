@@ -1,5 +1,5 @@
 ##
-## digiserve/custom_reports
+## ghcr.io/cruglobal-ai/ab-custom-reports
 ##
 ## This is our microservice for handling all our incoming AB api requests.
 ##
@@ -8,19 +8,19 @@
 ##
 ## Docker Commands:
 ## ---------------
-## $ docker build -t digiserve/ab-custom-reports:develop .
-## $ docker push digiserve/ab-custom-reports:develop
+## $ docker build -t ghcr.io/cruglobal-ai/ab-custom-reports:develop .
+## $ docker push ghcr.io/cruglobal-ai/ab-custom-reports:develop
 ##
 ## Multi-platform (M1/M2/M3 Mac → amd64 + arm64):
 ## $ docker buildx create --use  # once, if no builder
-## $ docker buildx build --provenance=true --sbom=true --platform linux/amd64,linux/arm64 -t digiserve/ab-custom-reports:develop --push .
+## $ docker buildx build --provenance=true --sbom=true --platform linux/amd64,linux/arm64 -t ghcr.io/cruglobal-ai/ab-custom-reports:develop --push .
 ## Or use: $ DOCKER_ARGS="--platform linux/amd64,linux/arm64 --push" ./build.sh
 ## Supply chain: use --provenance=true --sbom=true when pushing to a registry for Docker Hub attestations and license visibility.
 ##
 
 ARG BRANCH=master
 
-FROM digiserve/service-cli:${BRANCH}
+FROM ghcr.io/cruglobal-ai/service-cli:${BRANCH}
 
 # OCI labels for Docker Hub / Scout (license, description)
 LABEL org.opencontainers.image.title="Custom Reports" \
